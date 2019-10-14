@@ -4,13 +4,13 @@ for (mod, fname) in ((:Base, :sum), (:Base, :prod), (:Base, :maximum), (:Base, :
     @eval begin
         @inline ($mod.$fname)(A::AbDimArray) = ($mod.$fname)(parent(A))
         @inline ($mod.$_fname)(A::AbstractArray, dims::AllDimensions) =
-            rebuild(A, ($mod.$_fname)(parent(A), dimnum(A, dims)), reducedims(A, dims))
+            rebuildreduced(A, ($mod.$_fname)(parent(A), dimnum(A, dims)), dims)
         @inline ($mod.$_fname)(f, A::AbstractArray, dims::AllDimensions) =
-            rebuild(A, ($mod.$_fname)(f, parent(A), dimnum(A, dims)), reducedims(A, dims))
+            rebuildreduced(A, ($mod.$_fname)(f, parent(A), dimnum(A, dims)), dims)
         @inline ($mod.$_fname)(A::AbDimArray, dims::Union{Int,Base.Dims}) =
-            rebuild(A, ($mod.$_fname)(parent(A), dims), reducedims(A, dims))
+            rebuildreduced(A, ($mod.$_fname)(parent(A), dims), dims)
         @inline ($mod.$_fname)(f, A::AbDimArray, dims::Union{Int,Base.Dims}) =
-            rebuild(A, ($mod.$_fname)(f, parent(A), dims), reducedims(A, dims))
+            rebuildreduced(A, ($mod.$_fname)(f, parent(A), dims), dims)
     end
 end
 
@@ -19,22 +19,22 @@ for fname in (:std, :var)
     @eval begin
         @inline (Statistics.$fname)(A::AbDimArray) = (Statistics.$fname)(parent(A))
         @inline (Statistics.$_fname)(A::AbstractArray, corrected::Bool, mean, dims::AllDimensions) =
-            rebuild(A, (Statistics.$_fname)(A, corrected, mean, dimnum(A, dims)), reducedims(A, dims))
+            rebuildreduced(A, (Statistics.$_fname)(A, corrected, mean, dimnum(A, dims)), dims)
         @inline (Statistics.$_fname)(A::AbDimArray, corrected::Bool, mean, dims::Union{Int,Base.Dims}) =
-            rebuild(A, (Statistics.$_fname)(parent(A), corrected, mean, dims), reducedims(A, dims))
+            rebuildreduced(A, (Statistics.$_fname)(parent(A), corrected, mean, dims), dims)
     end
 end
 
 Statistics.median(A::AbDimArray) = Statistics.median(parent(A))
 Statistics._median(A::AbstractArray, dims::AllDimensions) =
-    rebuild(A, Statistics._median(parent(A), dimnum(A, dims)), reducedims(A, dims))
+    rebuildreduced(A, Statistics._median(parent(A), dimnum(A, dims)), dims)
 Statistics._median(A::AbDimArray, dims::Union{Int,Base.Dims}) =
-    rebuild(A, Statistics._median(parent(A), dims), reducedims(A, dims))
+    rebuildreduced(A, Statistics._median(parent(A), dims), dims)
 
 Base._mapreduce_dim(f, op, nt::NamedTuple{(),<:Tuple}, A::AbstractArray, dims::AllDimensions) =
-    rebuild(A, Base._mapreduce_dim(f, op, nt, parent(A), dimnum(A, dims)), reducedims(A, dims))
+    rebuildreduced(A, Base._mapreduce_dim(f, op, nt, parent(A), dimnum(A, dims)), dims)
 Base._mapreduce_dim(f, op, nt::NamedTuple{(),<:Tuple}, A::AbDimArray, dims::Union{Int,Base.Dims}) =
-    rebuild(A, Base._mapreduce_dim(f, op, nt, parent(A), dimnum(A, dims)), reducedims(A, dims))
+    rebuildreduced(A, Base._mapreduce_dim(f, op, nt, parent(A), dimnum(A, dims)), dims)
 # Unfortunately Base/accumulate.jl kwargs methods all force dims to be Integer.
 # accumulate wont work unless that is relaxed, or we copy half of the file here.
 Base._accumulate!(op, B, A, dims::AllDimensions, init::Union{Nothing, Some}) =
@@ -82,8 +82,7 @@ for fname in (:cor, :cov)
 end
 
 @inline Base.reverse(A::AbDimArray{T,N}; dims=1) where {T,N} = begin
-    dnum = dimnum(A, dims)
-    # Reverse the dimension. TODO: make this type stable
+    dnum = dimnum(A, dims) # Reverse the dimension. TODO: make this type stable
     newdims = revdims(DimensionalData.dims(A), dnum)
     # Reverse the data
     newdata = reverse(parent(A); dims=dnum)
@@ -109,3 +108,20 @@ end
 
 Base.permutedims(A::AbDimArray{T,N}, perm) where {T,N} = 
     rebuild(A, permutedims(parent(A), dimnum(A, perm)), permutedims(dims(A), perm))
+
+Base.diff(A::AbDimArray{T,1}) where T = Base.diff(parent(A::AbDimArray)) = 
+Base.diff(A::AbDimArray; dims)  = 
+    rebuild(A, permutedims(parent(A), dimnum(A, perm)), permutedims(dims(A), perm))
+
+Base.unique(A::AbDimArray{T,1}) where T = Base.unique(parent(A::AbDimArray)) = 
+Base.unique(A::AbDimArray; dims)  = 
+    rebuild(A, permutedims(parent(A), dimnum(A, perm)), permutedims(dims(A), perm))
+
+Base._unique_dims(A::AbstractArray, dims::AbDim) =
+    Base._unique_dims(parent(A), dims)
+Base._extrema_dims(f, A::AbstractArray, dims::AbDim)
+    rebuildreduced(A, Base._extrema_dims(f, parent(A), dimnum(A, dims)), dims)
+
+firstindex(A::AbstractArray, d::AbDim) = firstindex(A, dimnum(A, d))
+lastindex(A::AbstractArray, d::AbDim) = lastindex(A, dimnum(A, d))
+

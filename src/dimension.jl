@@ -70,7 +70,8 @@ end
 
 # AbstractArray methods where dims are the dispatch argument
 
-@inline rebuildsliced(A, data, I) = rebuild(A, data, slicedims(A, I)...)
+@inline rebuildsliced(A, data, I) = rebuild(A, data, dims(A, I)...)
+@inline rebuildreduced(A, data, dims) = rebuild(A, data, reducedims(A, dims)...)
 
 Base.@propagate_inbounds Base.getindex(A::AbstractArray, dims::Vararg{<:AbDim{<:Number}}) =
     getindex(A, dims2indices(A, dims)...)
